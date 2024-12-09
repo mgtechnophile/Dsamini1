@@ -1,0 +1,192 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct TaskNode {
+    char task[100];
+    char priority[10]; // High, Medium, Low
+    struct TaskNode* next;
+} TaskNode;
+
+TaskNode* createNode(const char* task, const char* priority);
+void addTask(TaskNode** head, const char* task, const char* priority);
+void removeTask(TaskNode** head, int taskNumber);
+void displayTasks(TaskNode* head);
+void saveToFile(TaskNode* head, const char* filename);
+void loadFromFile(TaskNode** head, const char* filename);
+void freeList(TaskNode* head);
+
+int main() {
+    TaskNode* toDoList = NULL;
+    int choice, taskNumber;
+    char task[100], priority[10];
+
+    loadFromFile(&toDoList, "tasks.txt");
+
+    while (1) {
+        printf("\nTo-Do List Menu:\n");
+        printf("1. Add a task\n");
+        printf("2. Remove a task\n");
+        printf("3. View all tasks\n");
+        printf("4. Save and Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+        getchar(); // Consume newline
+
+        switch (choice) {
+            case 1:
+                printf("Enter the task: ");
+                fgets(task, sizeof(task), stdin);
+                task[strcspn(task, "\n")] = '\0'; // Remove newline
+
+                printf("Enter priority (High/Medium/Low): ");
+                fgets(priority, sizeof(priority), stdin);
+                priority[strcspn(priority, "\n")] = '\0'; // Remove newline
+
+                addTask(&toDoList, task, priority);
+                break;
+
+            case 2:
+                printf("Enter the task number to remove: ");
+                scanf("%d", &taskNumber);
+                removeTask(&toDoList, taskNumber);
+                break;
+
+            case 3:
+                displayTasks(toDoList);
+                break;
+
+            case 4:
+                saveToFile(toDoList, "tasks.txt");
+                printf("Tasks saved! Exiting the application. Goodbye!\n");
+                freeList(toDoList);
+                return 0;
+
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+    }
+}
+
+TaskNode* createNode(const char* task, const char* priority) {
+    TaskNode* newNode = (TaskNode*)malloc(sizeof(TaskNode));
+    if (!newNode) {
+        printf("Memory allocation failed!\n");
+        exit(1);
+    }
+    strcpy(newNode->task, task);
+    strcpy(newNode->priority, priority);
+    newNode->next = NULL;
+    return newNode;
+}
+
+void addTask(TaskNode** head, const char* task, const char* priority) {
+    TaskNode* newNode = createNode(task, priority);
+    if (!*head || strcmp(priority, "High") == 0) {
+        newNode->next = *head;
+        *head = newNode;
+    } else {
+        TaskNode* current = *head;
+        TaskNode* prev = NULL;
+
+        while (current && strcmp(current->priority, "Low") != 0) {
+            prev = current;
+            current = current->next;
+        }
+
+        if (prev) {
+            prev->next = newNode;
+        } else {
+            *head = newNode;
+        }
+        newNode->next = current;
+    }
+    printf("Task added: %s (Priority: %s)\n", task, priority);
+}
+
+void removeTask(TaskNode** head, int taskNumber) {
+    if (!*head) {
+        printf("The to-do list is empty.\n");
+        return;
+    }
+
+    TaskNode* temp = *head;
+    if (taskNumber == 1) {
+        *head = temp->next;
+        printf("Task removed: %s\n", temp->task);
+        free(temp);
+        return;
+    }
+
+    TaskNode* prev = NULL;
+    int count = 1;
+
+    while (temp && count != taskNumber) {
+        prev = temp;
+        temp = temp->next;
+        count++;
+    }
+
+    if (!temp) {
+        printf("Invalid task number.\n");
+        return;
+    }
+
+    prev->next = temp->next;
+    printf("Task removed: %s\n", temp->task);
+    free(temp);
+}
+
+void displayTasks(TaskNode* head) {
+    if (!head) {
+        printf("Your to-do list is empty.\n");
+        return;
+    }
+
+    TaskNode* temp = head;
+    int count = 1;
+    printf("\nTo-Do List:\n");
+    while (temp) {
+        printf("%d. %s (Priority: %s)\n", count++, temp->task, temp->priority);
+        temp = temp->next;
+    }
+}
+
+void saveToFile(TaskNode* head, const char* filename) {
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        printf("Failed to open file for saving.\n");
+        return;
+    }
+
+    TaskNode* temp = head;
+    while (temp) {
+        fprintf(file, "%s,%s\n", temp->task, temp->priority);
+        temp = temp->next;
+    }
+    fclose(file);
+}
+
+void loadFromFile(TaskNode** head, const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        return; // No saved tasks
+    }
+
+    char line[120];
+    while (fgets(line, sizeof(line), file)) {
+        char task[100], priority[10];
+        sscanf(line, "%[^,],%s", task, priority); // Split by comma
+        addTask(head, task, priority);
+    }
+    fclose(file);
+}
+
+void freeList(TaskNode* head) {
+    TaskNode* temp;
+    while (head) {
+        temp = head;
+        head = head->next;
+        free(temp);
+    }
+}
